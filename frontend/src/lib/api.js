@@ -58,7 +58,27 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A deployed build with no VITE_API_URL calls its own origin, where no API
+ * exists. That surfaces as a bare 404/405 that looks like an application bug,
+ * so name the actual cause instead.
+ */
+function isMisconfiguredDeployment(response) {
+  if (BASE) return false;                       // an API origin was configured
+  if (![404, 405].includes(response.status)) return false;
+  const { hostname } = window.location;
+  return hostname !== "localhost" && hostname !== "127.0.0.1";
+}
+
 async function parseError(response) {
+  if (isMisconfiguredDeployment(response)) {
+    return new ApiError(
+      "This deployment has no API configured. Set VITE_API_URL to the API's " +
+        "URL in your hosting provider and redeploy.",
+      response.status,
+    );
+  }
+
   let detail = `Request failed (${response.status})`;
   let fieldErrors = [];
   try {
