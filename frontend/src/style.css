@@ -1,0 +1,254 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Bearly design tokens — Stash brand.
+
+   Warm paper surfaces, brown fur ink, and a single action colour taken from
+   the approved lockup. Status and series hues stay reserved for data.
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --page: #f3eee6;
+  --card: #fffdf9;
+  --raised: #f8f2e7;
+
+  --ink: #1a1611;
+  --ink-muted: #6b6252;
+  --ink-subtle: #8a8274;
+
+  --line: #e3dacb;
+  --line-strong: #d4c8b4;
+
+  --primary: #8f5a1e;
+  --primary-ink: #fffdf9;
+  --primary-soft: #f0e5d2;
+
+  --composer: #f8f2e7;
+  --composer-line: #e7dcc7;
+  --bubble: #f0e5d2;
+  --fur: #8b5e34;
+  --ear: #c89a6b;
+
+  /* Status colours are reserved: never reused as a chart series. */
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #a72d2d;
+
+  /* Categorical series, fixed order — never cycled, never reassigned by rank. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  --grid: #e3dacb;
+  --axis: #d4c8b4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --page: #1a1611;
+    --card: #241a12;
+    --raised: #2c2218;
+
+    --ink: #fffdf9;
+    --ink-muted: #b3a68b;
+    --ink-subtle: #8a8274;
+
+    --line: #3a2e24;
+    --line-strong: #4a3c2e;
+
+    --primary: #c89a6b;
+    --primary-ink: #1a1611;
+    --primary-soft: #3a2a1c;
+
+    --composer: #2c2218;
+    --composer-line: #4a3c2e;
+    --bubble: #3a2e24;
+    --fur: #c89a6b;
+    --ear: #c89a6b;
+
+    --good: #0ca30c;
+    --good-ink: #3fce3f;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --critical-ink: #f07b7b;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+
+    --grid: #3a2e24;
+    --axis: #4a3c2e;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #1a1611;
+  --card: #241a12;
+  --raised: #2c2218;
+  --ink: #fffdf9;
+  --ink-muted: #b3a68b;
+  --ink-subtle: #8a8274;
+  --line: #3a2e24;
+  --line-strong: #4a3c2e;
+  --primary: #c89a6b;
+  --primary-ink: #1a1611;
+  --primary-soft: #3a2a1c;
+  --composer: #2c2218;
+  --composer-line: #4a3c2e;
+  --bubble: #3a2e24;
+  --fur: #c89a6b;
+  --ear: #c89a6b;
+  --good: #0ca30c;
+  --good-ink: #3fce3f;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #f07b7b;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --grid: #3a2e24;
+  --axis: #4a3c2e;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--page);
+    color: var(--ink);
+    font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-feature-settings: "ss01", "ss02";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: var(--primary);
+  }
+
+  a:hover {
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Chat avatar idle loop — timings are co-prime so it never reads as a GIF. */
+@keyframes bl-sway {
+  0%, 100% { transform: rotate(-1.8deg) translateY(0); }
+  50% { transform: rotate(1.8deg) translateY(-2px); }
+}
+@keyframes bl-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes bl-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+}
+@keyframes bl-ear {
+  0%, 86%, 100% { transform: rotate(0deg); }
+  90% { transform: rotate(-9deg); }
+  95% { transform: rotate(5deg); }
+}
+@keyframes bl-brow {
+  0%, 70%, 100% { transform: translateY(0); }
+  80% { transform: translateY(-3px); }
+}
+@keyframes bl-dot {
+  0%, 100% { transform: translateY(0); opacity: 0.35; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes bl-ring {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.bear-live .bl-sway,
+.bear-live .bl-breathe,
+.bear-live .bl-blink,
+.bear-live .bl-ear-l,
+.bear-live .bl-ear-r,
+.bear-live .bl-brow {
+  transform-box: fill-box;
+}
+
+.bear-live .bl-sway {
+  transform-origin: 50% 90%;
+  animation: bl-sway 4.2s ease-in-out infinite;
+}
+.bear-live .bl-breathe {
+  transform-origin: 50% 80%;
+  animation: bl-breathe 3.4s ease-in-out infinite;
+}
+.bear-live .bl-blink {
+  transform-origin: 50% 50%;
+  animation: bl-blink 5.6s ease-in-out infinite;
+}
+.bear-live .bl-ear-l {
+  transform-origin: 80% 90%;
+  animation: bl-ear 6s ease-in-out infinite;
+}
+.bear-live .bl-ear-r {
+  transform-origin: 20% 90%;
+  animation: bl-ear 6s ease-in-out 0.35s infinite;
+}
+.bear-live .bl-brow {
+  transform-origin: 50% 50%;
+  animation: bl-brow 5.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bear-live .bl-sway,
+  .bear-live .bl-breathe,
+  .bear-live .bl-blink,
+  .bear-live .bl-ear-l,
+  .bear-live .bl-ear-r,
+  .bear-live .bl-brow {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,41 @@
+# --- Secrets: never commit these ------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+!**/tailwind.config.js
+
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Databases (may contain real user financial data) ---------------------
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sql.gz
+
+# --- Node / build ---------------------------------------------------------
+node_modules/
+dist/
+.vite/
+*.log
+
+# --- Editors / OS ---------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# A separate local repo that appeared here; excluded rather than nested.
+bearly_1/

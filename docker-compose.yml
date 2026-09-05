@@ -1,0 +1,77 @@
+# Bearly production stack: PostgreSQL + API + nginx-served frontend.
+#
+#   cp .env.production.example .env && edit it
+#   docker compose up -d --build
+#
+# Put a TLS-terminating reverse proxy (Caddy, Traefik, an ALB) in front of `web`.
+# Nothing here terminates HTTPS itself.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bearly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-bearly}
+      # Deterministic collation, so index ordering cannot shift under you.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - bearly_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bearly} -d ${POSTGRES_DB:-bearly}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    # Not published: only the api service reaches the database.
+    expose:
+      - "5432"
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BEARLY_ENVIRONMENT: production
+      BEARLY_SECRET_KEY: ${BEARLY_SECRET_KEY:?BEARLY_SECRET_KEY is required}
+      BEARLY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bearly}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bearly}
+      BEARLY_CORS_ORIGINS: ${BEARLY_CORS_ORIGINS}
+      BEARLY_TRUSTED_HOSTS: ${BEARLY_TRUSTED_HOSTS}
+      BEARLY_APP_BASE_URL: ${BEARLY_APP_BASE_URL}
+      BEARLY_ACCESS_TOKEN_MINUTES: ${BEARLY_ACCESS_TOKEN_MINUTES:-60}
+      BEARLY_REFRESH_TOKEN_DAYS: ${BEARLY_REFRESH_TOKEN_DAYS:-14}
+      BEARLY_MAX_FAILED_LOGINS: ${BEARLY_MAX_FAILED_LOGINS:-8}
+      BEARLY_LOCKOUT_MINUTES: ${BEARLY_LOCKOUT_MINUTES:-15}
+      # Password reset is undeliverable without SMTP, so the API refuses to boot.
+      BEARLY_SMTP_HOST: ${BEARLY_SMTP_HOST:?BEARLY_SMTP_HOST is required}
+      BEARLY_SMTP_PORT: ${BEARLY_SMTP_PORT:-587}
+      BEARLY_SMTP_USER: ${BEARLY_SMTP_USER}
+      BEARLY_SMTP_PASSWORD: ${BEARLY_SMTP_PASSWORD}
+      BEARLY_SMTP_FROM: ${BEARLY_SMTP_FROM}
+      BEARLY_AI_PROVIDER: ${BEARLY_AI_PROVIDER:-stub}
+      BEARLY_AI_CHAT_MODEL: ${BEARLY_AI_CHAT_MODEL:-claude-haiku-4-5}
+      BEARLY_AI_ROUTINE_MODEL: ${BEARLY_AI_ROUTINE_MODEL:-claude-haiku-4-5}
+      BEARLY_AI_PLANNER_MODEL: ${BEARLY_AI_PLANNER_MODEL:-claude-opus-5}
+      BEARLY_AI_CACHE_HOURS: ${BEARLY_AI_CACHE_HOURS:-24}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BEARLY_WORKERS: ${BEARLY_WORKERS:-4}
+    expose:
+      - "8000"
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Bound to loopback: your TLS proxy forwards to it. Change to 8080:8080
+      # only if this host is itself behind a load balancer.
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  bearly_pgdata:
