@@ -1,0 +1,73 @@
+# Render blueprint: API + managed PostgreSQL.
+#
+# The frontend is NOT here — it deploys to Vercel (see frontend/vercel.json).
+# Render is used for the API because it runs a persistent process, which this
+# app needs: the chat streams over SSE and the database pool is long-lived.
+#
+#   1. Push this repo to GitHub
+#   2. Render -> New -> Blueprint -> pick the repo
+#   3. Fill in the variables marked sync:false
+#   4. Set VITE_API_URL in Vercel to the API's URL, and BEARLY_CORS_ORIGINS
+#      here to the Vercel URL
+
+databases:
+  - name: bearly-db
+    databaseName: bearly
+    user: bearly
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: bearly-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: BEARLY_ENVIRONMENT
+        value: production
+
+      # Render injects the connection string. The app needs the psycopg driver
+      # in the URL, so it is rewritten at startup (see app/core/config.py).
+      - key: BEARLY_DATABASE_URL
+        fromDatabase:
+          name: bearly-db
+          property: connectionString
+
+      - key: BEARLY_SECRET_KEY
+        generateValue: true          # Render generates a strong value once
+
+      # Your Vercel URL, e.g. https://bearly.vercel.app
+      - key: BEARLY_CORS_ORIGINS
+        sync: false
+      # This service's own hostname, e.g. bearly-api.onrender.com
+      - key: BEARLY_TRUSTED_HOSTS
+        sync: false
+      # Public frontend URL — password-reset links are built from it
+      - key: BEARLY_APP_BASE_URL
+        sync: false
+
+      - key: BEARLY_SMTP_HOST
+        sync: false
+      - key: BEARLY_SMTP_PORT
+        value: "587"
+      - key: BEARLY_SMTP_USER
+        sync: false
+      - key: BEARLY_SMTP_PASSWORD
+        sync: false
+      - key: BEARLY_SMTP_FROM
+        sync: false
+
+      - key: BEARLY_AI_PROVIDER
+        value: anthropic
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BEARLY_AI_CHAT_MODEL
+        value: claude-haiku-4-5
+
+      # One instance, small plan: keep workers modest so the connection pool
+      # stays well under the database's limit.
+      - key: BEARLY_WORKERS
+        value: "2"

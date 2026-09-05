@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated, Callable, Iterator, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
@@ -77,8 +77,19 @@ def send_message(
     user: CurrentUser,
     db: DbSession,
     session_factory: Annotated[Callable, Depends(get_session_factory)],
+    stream: bool = Query(
+        default=True,
+        description="Set false to receive one JSON reply instead of an SSE stream. "
+        "Needed behind proxies that buffer streaming responses.",
+    ),
 ):
-    """Append the user's turn, then stream the assistant's reply as SSE."""
+    """Append the user's turn, then return the assistant's reply.
+
+    Streams over SSE by default. `?stream=false` collects the same events and
+    returns a single JSON object, for CDNs and serverless platforms that buffer
+    streaming responses — where a stream would arrive all at once at the end, or
+    not at all.
+    """
     convo = owned_or_404(db, ChatConversation, conversation_id, user)
 
     user_message = ChatMessage(
@@ -154,6 +165,34 @@ def send_message(
             )
         finally:
             session.close()
+
+    if not stream:
+        collected_text, tool_log, done_event = [], [], None
+        for frame in event_stream():
+            if not frame.startswith("data: "):
+                continue
+            event = json.loads(frame[6:].strip())
+            if event["type"] == "text":
+                collected_text.append(event["delta"])
+            elif event["type"] == "tool":
+                tool_log.append(
+                    {"name": event["name"], "label": event.get("label"),
+                     "input": event.get("input", {})}
+                )
+            elif event["type"] in ("done", "error"):
+                done_event = event
+        if done_event is not None and done_event.get("type") == "error":
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=done_event["message"]
+            )
+        return {
+            "role": "assistant",
+            "content": "".join(collected_text),
+            "tool_calls": (done_event or {}).get("tools_used", tool_log),
+            "message_id": (done_event or {}).get("message_id"),
+            "provider": (done_event or {}).get("provider"),
+            "model": (done_event or {}).get("model"),
+        }
 
     return StreamingResponse(
         event_stream(),

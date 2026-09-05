@@ -215,3 +215,39 @@ def test_empty_and_oversized_messages_rejected(client, auth):
         json={"content": "x" * 3000},
         headers=auth,
     ).status_code == 422
+
+
+def test_non_streaming_mode_returns_one_json_reply(client, auth):
+    """For proxies that buffer SSE: same answer, single JSON response."""
+    client.put(f"{API}/profile", json=HEALTHY, headers=auth)
+    convo_id = new_convo(client, auth)
+
+    r = client.post(
+        f"{API}/ai/chat/conversations/{convo_id}/messages?stream=false",
+        json={"content": "Where do I stand?"},
+        headers=auth,
+    )
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/json")
+
+    body = r.json()
+    assert body["role"] == "assistant"
+    assert body["content"].strip()
+    assert body["tool_calls"]        # the engine was still consulted
+    assert body["message_id"]
+
+    # And it is persisted identically to the streaming path.
+    detail = client.get(f"{API}/ai/chat/conversations/{convo_id}", headers=auth).json()
+    assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
+    assert detail["messages"][1]["content"] == body["content"]
+
+
+def test_streaming_and_non_streaming_agree(client, auth):
+    client.put(f"{API}/profile", json=HEALTHY, headers=auth)
+    streamed, _, _ = stream(client, auth, new_convo(client, auth), "Where do I stand?")
+    plain = client.post(
+        f"{API}/ai/chat/conversations/{new_convo(client, auth)}/messages?stream=false",
+        json={"content": "Where do I stand?"},
+        headers=auth,
+    ).json()["content"]
+    assert streamed.strip() == plain.strip()

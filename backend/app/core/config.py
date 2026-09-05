@@ -65,6 +65,22 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
     tenki_api_key: str = Field(default="", validation_alias="TENKI_API_KEY")
 
+    @field_validator("database_url")
+    @classmethod
+    def _normalise_database_url(cls, v: str) -> str:
+        """Accept the connection strings hosting providers actually hand out.
+
+        Render, Railway, Heroku and Fly all supply `postgres://...`, which
+        SQLAlchemy 2 refuses, and `postgresql://` selects psycopg2, which is not
+        installed. Both are rewritten to the psycopg 3 driver so the value can be
+        pasted in unmodified.
+        """
+        if v.startswith("postgres://"):
+            return "postgresql+psycopg://" + v[len("postgres://"):]
+        if v.startswith("postgresql://"):
+            return "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
+
     @field_validator("secret_key")
     @classmethod
     def _require_strong_secret_in_prod(cls, v: str, info) -> str:
