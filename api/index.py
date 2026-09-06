@@ -20,11 +20,34 @@ if str(BACKEND) not in sys.path:
 # BEARLY_DATABASE_URL. Map whichever is present, preferring a pooled URL —
 # serverless opens a connection per invocation, and an unpooled endpoint runs
 # out of slots quickly.
+def _clean_pg_url(url: str) -> str:
+    """Strip query parameters libpq does not understand.
+
+    Vercel's POSTGRES_PRISMA_URL carries Prisma-only options such as
+    `pgbouncer=true` and `connection_limit`; psycopg rejects the whole URL with
+    `invalid URI query parameter`. Anything libpq does not own is dropped.
+    """
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+    # Options libpq actually accepts; everything else is an ORM-ism.
+    keep = {
+        "sslmode", "sslrootcert", "sslcert", "sslkey", "connect_timeout",
+        "application_name", "options", "target_session_attrs", "channel_binding",
+    }
+    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k in keep]
+    return urlunsplit(parts._replace(query=urlencode(kept)))
+
+
 if not os.getenv("BEARLY_DATABASE_URL"):
-    for candidate in ("POSTGRES_PRISMA_URL", "POSTGRES_URL", "DATABASE_URL"):
+    # POSTGRES_URL first: it is the plain pooled URL. The Prisma variant is a
+    # last resort because its extra parameters have to be stripped.
+    for candidate in ("POSTGRES_URL", "DATABASE_URL", "POSTGRES_PRISMA_URL"):
         value = os.getenv(candidate)
         if value:
-            os.environ["BEARLY_DATABASE_URL"] = value
+            os.environ["BEARLY_DATABASE_URL"] = _clean_pg_url(value)
             break
 
 def _migrate() -> None:
