@@ -42,9 +42,12 @@ services:
       # Your Vercel URL, e.g. https://bearly.vercel.app
       - key: BEARLY_CORS_ORIGINS
         sync: false
-      # This service's own hostname, e.g. bearly-api.onrender.com
+      # Filled in by Render with this service's own hostname.
       - key: BEARLY_TRUSTED_HOSTS
-        sync: false
+        fromService:
+          name: bearly-api
+          type: web
+          property: host
       # Public frontend URL — password-reset links are built from it
       - key: BEARLY_APP_BASE_URL
         sync: false
@@ -53,19 +56,11 @@ services:
       # does not work — it only exists so the first deploy is not blocked.
       - key: BEARLY_ALLOW_NO_EMAIL
         value: "true"
-      - key: BEARLY_SMTP_HOST
-        sync: false
-      - key: BEARLY_SMTP_PORT
-        value: "587"
-      - key: BEARLY_SMTP_USER
-        sync: false
-      - key: BEARLY_SMTP_PASSWORD
-        sync: false
-      - key: BEARLY_SMTP_FROM
-        sync: false
 
+      # 'stub' runs the whole app with no inference and no cost. Switch to
+      # 'anthropic' and add ANTHROPIC_API_KEY once it is up.
       - key: BEARLY_AI_PROVIDER
-        value: anthropic
+        value: stub
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: BEARLY_AI_CHAT_MODEL
