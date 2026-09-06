@@ -67,91 +67,68 @@ and dangerously if missing:
 
 ---
 
-## Deploying with Vercel
+## Deploying to Vercel (everything on one platform)
 
-Vercel hosts the **frontend**. The API runs elsewhere.
+Frontend and API deploy together. `vercel.json` routes `/api/*` to a Python
+serverless function and everything else to the SPA, so the two are **same
+origin** — no CORS configuration, and `VITE_API_URL` stays empty.
 
-### Why the API is not on Vercel
+### Steps
 
-Vercel's Python functions are serverless, and three things in this app do not fit:
+1. **Vercel → Add New Project →** import the repo.
+   **Root Directory must be `/` (the repo root)**, not `frontend` — the build
+   needs to see both `frontend/` and `api/`.
 
-- **The chat streams over SSE.** Serverless Python buffers the response, so a
-  reply arrives all at once at the end — or times out first.
-- **Function duration is capped.** A chat turn that runs tool calls takes several
-  seconds; a planner turn can exceed the limit.
-- **Database connections are per-invocation.** A long-lived pool is impossible,
-  and Postgres connection slots exhaust quickly without an external pooler.
+2. **Add a database.** Vercel → Storage → Create → Postgres (Neon). Connecting
+   it sets `POSTGRES_URL` automatically; `api/index.py` maps it to
+   `BEARLY_DATABASE_URL`, preferring the pooled URL because a serverless
+   function opens a connection per invocation.
 
-So: frontend on Vercel, API on a host that runs a persistent process. `render.yaml`
-in this repo does exactly that. Railway, Fly.io and any container host work too —
-they all build `backend/Dockerfile`.
+3. **Set environment variables:**
 
-### 1. Deploy the API
+   | Key | Value |
+   |---|---|
+   | `BEARLY_ENVIRONMENT` | `production` |
+   | `BEARLY_SECRET_KEY` | `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` |
+   | `BEARLY_TRUSTED_HOSTS` | your Vercel hostname, e.g. `bearly.vercel.app` |
+   | `BEARLY_CORS_ORIGINS` | the same URL with `https://` |
+   | `BEARLY_APP_BASE_URL` | the same `https://` URL |
+   | `BEARLY_ALLOW_NO_EMAIL` | `true` until SMTP exists |
+   | `BEARLY_AUTO_MIGRATE` | `true` |
+   | `VITE_CHAT_STREAMING` | `false` |
+   | `BEARLY_AI_PROVIDER` | `stub`, or `anthropic` with `ANTHROPIC_API_KEY` |
 
-Render → **New** → **Blueprint** → select this repo. It creates the API and a
-managed PostgreSQL instance. Fill in the variables marked `sync: false`.
+4. **Deploy.** Check `https://your-app.vercel.app/health` returns
+   `{"status":"ok"}`, then register a user.
 
-`BEARLY_SECRET_KEY` is generated for you. Migrations run automatically on every
-deploy — the container executes `alembic upgrade head` before gunicorn starts.
+### Why these particular settings
 
-Note the resulting hostname, e.g. `bearly-api.onrender.com`.
+**`BEARLY_AUTO_MIGRATE=true`** — there is no shell on Vercel, so
+`alembic upgrade head` cannot be run by hand. The function runs it on cold
+start instead. Alembic is idempotent, so once the schema is current it is a
+fast no-op.
 
-### 2. Deploy the frontend
+**`VITE_CHAT_STREAMING=false`** — Vercel's Python runtime buffers responses, so
+Server-Sent Events would arrive all at once at the end and look like a hang.
+The client asks for a single buffered reply instead. The content is identical;
+there is a test asserting it.
 
-Vercel → **Add New Project** → select this repo → set **Root Directory** to
-`frontend`. `frontend/vercel.json` supplies the build settings.
+**Postgres is required.** SQLite cannot work: the filesystem is ephemeral and
+read-only, so every cold start would lose all data.
 
-Add one environment variable:
+### Limits worth knowing
 
-```
-VITE_API_URL = https://bearly-api.onrender.com
-```
+- **Cold starts.** The first request after idle pays for the Python runtime
+  booting, the imports, and the migration check — several seconds.
+- **60-second function ceiling.** Fine for chat turns (a few seconds), but this
+  is a hard cap.
+- **Connection pooling matters.** Use the pooled database URL. An unpooled
+  endpoint runs out of connection slots as invocations scale.
 
-This is a **build-time** variable — Vite inlines it. Changing it later requires a
-redeploy, not just a restart.
+If any of those become a problem, `render.yaml` in this repo deploys the same
+`backend/Dockerfile` as a persistent service, where none of them apply — real
+SSE streaming, no cold starts, a long-lived connection pool.
 
-### 3. Connect the two
-
-Back on Render, set these to your Vercel URL:
-
-```
-BEARLY_CORS_ORIGINS  = https://your-app.vercel.app
-BEARLY_APP_BASE_URL  = https://your-app.vercel.app
-BEARLY_TRUSTED_HOSTS = bearly-api.onrender.com
-```
-
-`BEARLY_TRUSTED_HOSTS` is the **API's** hostname, not the frontend's — it
-validates the Host header arriving at the API.
-
-### Two 404s this configuration fixes
-
-**`/api/...` returned 404.** With `VITE_API_URL` empty, the browser calls
-same-origin `/api/...`. That works locally only because the Vite dev server
-proxies it; a built bundle has no proxy, and Vercel serves no API. Setting
-`VITE_API_URL` points the browser at the real API.
-
-**Refreshing on `/login` returned 404.** Vue Router owns those paths; no such
-file exists in `dist/`. The rewrite in `frontend/vercel.json` returns
-`index.html` for non-asset paths so the router can take over.
-
-### If the chat appears to hang
-
-Some proxies buffer Server-Sent Events, so the reply lands all at once instead of
-streaming. Two mitigations, in order:
-
-1. Point `VITE_API_URL` straight at the API (as above) rather than routing `/api`
-   through a Vercel rewrite. This keeps the CDN out of the streaming path.
-2. If it persists, set `VITE_CHAT_STREAMING=false` in Vercel and redeploy. The
-   client then asks for `?stream=false` and receives one buffered JSON reply —
-   identical content, no incremental typing. There is a test asserting the two
-   paths produce the same answer.
-
-### Connection strings
-
-Render, Railway, Heroku and Fly hand out `postgres://...`. SQLAlchemy 2 rejects
-that scheme and `postgresql://` selects a driver that is not installed, so the
-app rewrites both to `postgresql+psycopg://` at startup. Paste the provider's
-value unmodified.
 
 ---
 

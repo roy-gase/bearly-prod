@@ -73,8 +73,9 @@ function isMisconfiguredDeployment(response) {
 async function parseError(response) {
   if (isMisconfiguredDeployment(response)) {
     return new ApiError(
-      "This deployment has no API configured. Set VITE_API_URL to the API's " +
-        "URL in your hosting provider and redeploy.",
+      "The API did not respond at this origin. If the API is deployed alongside " +
+        "the frontend, check that the serverless function built; if it runs " +
+        "elsewhere, set VITE_API_URL to its URL and redeploy.",
       response.status,
     );
   }
