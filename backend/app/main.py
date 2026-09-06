@@ -26,9 +26,17 @@ async def lifespan(app: FastAPI):
         # The schema is Alembic's job in production; creating it here would let
         # the database drift from the migration history unnoticed.
         if not settings.email_configured:
-            raise RuntimeError(
-                "BEARLY_SMTP_HOST must be set in production: without it, password "
-                "reset silently does nothing and users are locked out permanently."
+            if not settings.allow_no_email:
+                raise RuntimeError(
+                    "BEARLY_SMTP_HOST must be set in production: without it, password "
+                    "reset silently does nothing and users are locked out permanently. "
+                    "To deploy before SMTP is ready, set BEARLY_ALLOW_NO_EMAIL=true — "
+                    "password reset will not work until you configure SMTP."
+                )
+            logger.warning(
+                "SMTP is not configured and BEARLY_ALLOW_NO_EMAIL is set. "
+                "Password reset is DISABLED: anyone who forgets their password "
+                "cannot recover the account. Configure BEARLY_SMTP_HOST."
             )
         logger.info("Bearly API starting (production; schema managed by Alembic)")
     else:

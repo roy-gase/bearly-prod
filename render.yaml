@@ -49,6 +49,10 @@ services:
       - key: BEARLY_APP_BASE_URL
         sync: false
 
+      # Set to false once SMTP is configured. While true, password reset
+      # does not work — it only exists so the first deploy is not blocked.
+      - key: BEARLY_ALLOW_NO_EMAIL
+        value: "true"
       - key: BEARLY_SMTP_HOST
         sync: false
       - key: BEARLY_SMTP_PORT

@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     smtp_from: str = "Bearly <no-reply@bearly.app>"
     smtp_starttls: bool = True
     app_base_url: str = "http://localhost:5173"
+    # Escape hatch for a first deploy before SMTP exists. Password reset is
+    # non-functional while this is on, so it logs loudly on every start.
+    allow_no_email: bool = False
 
     # --- AI ---------------------------------------------------------------
     ai_provider: Literal["stub", "anthropic", "tenki"] = "stub"
